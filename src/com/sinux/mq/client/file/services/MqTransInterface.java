@@ -10,14 +10,17 @@ import java.util.List;
 import com.sinux.mq.client.MqConnectionFactory;
 import com.sinux.mq.client.mod.Constants;
 import com.sinux.mq.client.mod.FileTransControlMsg;
+import com.sinux.mq.client.mod.ReceveFileData;
+import com.sinux.mq.client.mod.RecvFileControl;
 import com.sinux.mq.client.mod.SendFileControl;
 import com.sinux.mq.client.mod.TransInfo;
 import com.sinux.mq.client.util.ByteBuffer;
+import com.sinux.mq.client.util.CommonFun;
 import com.sinux.mq.client.util.ComplexEvent;
 
 public class MqTransInterface {
 	private MqConnectionFactory factory = null;
-	
+
 	public MqTransInterface(MqConnectionFactory factory) {
 		this.factory = factory;
 	}
@@ -36,7 +39,7 @@ public class MqTransInterface {
 		int iRetVal = 0;
 		List serviceThreadList = new LinkedList();
 		try {
-			// logImpl.info("开始准备文件:"+absolutFileName+"发送的前期准备工作!");
+			// System.out.println("开始准备文件:"+absolutFileName+"发送的前期准备工作!");
 			File oFile = new File(absolutFileName);
 			if (!oFile.exists()) {
 				return -2;
@@ -77,7 +80,7 @@ public class MqTransInterface {
 					serviceThreadList.add(serviceThread);
 				}
 			}
-			// logImpl.info("开始计算文件:"+absolutFileName+"的SHA值!");
+			// System.out.println("开始计算文件:"+absolutFileName+"的SHA值!");
 			InetAddress inetAddress = InetAddress.getLocalHost();
 			String hostName = inetAddress.getHostName();
 			String hostAddress = inetAddress.getHostAddress();
@@ -92,7 +95,7 @@ public class MqTransInterface {
 			ByteBuffer.memcpy(shaValueBytes, Constants.CHUNKNUM_LENGTH, shaValueTmp, 0, Constants.DIGEST_LENGTH);// shaValueTmp.length);
 
 			// 开始准备传输
-			// logImpl.info("开始准备文件:"+absolutFileName+"的传输!");
+			// System.out.println("开始准备文件:"+absolutFileName+"的传输!");
 			List fileTransControlMsgList = new LinkedList();
 			List msgidList = new LinkedList();
 			long offsetFile = 0;
@@ -151,7 +154,7 @@ public class MqTransInterface {
 				fileTransControlMsgList.add(fileTransControlMsg);
 			}
 			// 开始激发线程
-			// logImpl.info("开始激发服务线程来传输文件:"+absolutFileName+"!");
+			// System.out.println("开始激发服务线程来传输文件:"+absolutFileName+"!");
 			for (int i = 0; i < serviceThreadNum; i++) {
 				byte[] msgid = new byte[24];
 				ByteBuffer.memset(msgid, (byte) ' ');
@@ -169,10 +172,12 @@ public class MqTransInterface {
 				serviceThread.prepareSend(GlobalVar.hSendFileControl, GlobalVar.synObjectSend, fileTransControlMsg,
 						transInfo, complexEvent, msgid, factory);
 			}
-			// logImpl.info("开始等待"+serviceThreadNum+"个服务线程传输文件:"+absolutFileName+"返回!");
-//			int statusValue = complexEvent.WaitForSingleObject(-1);
+
+			// System.out.println("开始等待"+serviceThreadNum+"个服务线程传输文件:"+absolutFileName+"返回!");
+			// int statusValue =
+			complexEvent.WaitForSingleObject(-1);
 			// 开始判断返回的结果
-			// logImpl.info("开始分析"+serviceThreadNum+"个服务线程传输文件:"+absolutFileName+"的返回结果!");
+			// System.out.println("开始分析"+serviceThreadNum+"个服务线程传输文件:"+absolutFileName+"的返回结果!");
 			boolean successFlag = true;
 			for (Iterator i = msgidList.iterator(); i.hasNext();) {
 				byte[] msgid = (byte[]) i.next();
@@ -225,228 +230,153 @@ public class MqTransInterface {
 	 */
 	@SuppressWarnings("rawtypes")
 	public List getReceiveFileList(String receiverName, int count) {
-//		 MqTranRecvService tranRecvService = new MqTranRecvService();
-//		 return tranRecvService.getReceiveFileList(receiverName,count);
-		return null;
+		MqTranRecvService tranRecvService = new MqTranRecvService(this.factory);
+		return tranRecvService.getReceiveFileList(receiverName + GlobalVar.fileTransControlQueueName, count);
 	}
+
 	/*
 	 * 接收此对象对应的文件数据,返回接收到的文件名
 	 */
-	// public String recvFile(ReceveFileData receveFileData,String
-	// dirName,String receiverName,TransInfo transInfo,List errorList)
-	// {
-	// String fileName = null;
-	// ComplexEvent complexEvent = null;
-	// List serviceThreadList = new LinkedList();
-	// try
-	// {
-	// if(receiverName==null)
-	// receiverName="";
-	// int serviceThreadNum = receveFileData.chunkcount,idleServiceThreadNum =
-	// 0;
-	// ThreadPool threadPool = ThreadPool.getSingleInstance();
-	// synchronized(GlobalVar.synObject)
-	// {
-	// //没有可用的线程进行服务
-	// idleServiceThreadNum = threadPool.getIdleThreadNum();
-	// if(idleServiceThreadNum<=0)
-	// {
-	// logImpl.error("接收文件:"+receveFileData.desc+"出现错误,错误信息:没有可用的线程进行服务!");
-	// return null;
-	// }
-	// //没有足够的可用线程来启动分块传输，请过段时间重试
-	// if (serviceThreadNum>idleServiceThreadNum)
-	// {
-	// logImpl.error("接收文件:"+receveFileData.desc+"出现错误,错误信息:没有足够的可用线程来启动分块传输，请过段时间重试!");
-	//
-	// return null;
-	// }
-	// complexEvent = new ComplexEvent(serviceThreadNum);
-	// //开始取出空闲的服务线程出来，以开始进行服务
-	// for(int i=0;i<serviceThreadNum;i++)
-	// {
-	// ServiceThread serviceThread = threadPool.getIdleServiceThread();
-	// serviceThreadList.add(serviceThread);
-	// }
-	// }
-	// //TransInfo transInfo = new TransInfo();
-	// List msgidList = new LinkedList();
-	// //开始激发线程
-	// logImpl.info("开始激发服务线程来接收文件:"+receveFileData.desc+"!");
-	// for(int i=0;i<serviceThreadNum;i++)
-	// {
-	// ServiceThread serviceThread = (ServiceThread)serviceThreadList.get(i);
-	// byte[] msgid = new byte[24];
-	// ByteBuffer.memset(msgid,(byte)' ');
-	// ByteBuffer.memcpy(msgid,0,receveFileData.msgid,0,Constants.CHUNKNUM_LENGTH+Constants.DIGEST_LENGTH);
-	// //String msgid =
-	// receveFileData.msgid.substring(0,receveFileData.msgid.length()-2);
-	// int chunkNum = 0;
-	// if(serviceThreadNum==1)
-	// chunkNum =0;
-	// else
-	// chunkNum = i+1;
-	// if(Integer.toString(chunkNum).length()<2)
-	// {
-	// ByteBuffer.memcpy(msgid,Constants.CHUNKNUM_LENGTH+Constants.DIGEST_LENGTH,
-	// ("0"+Integer.toString(chunkNum)).getBytes(),0,2);
-	//
-	// }
-	// else
-	// ByteBuffer.memcpy(msgid,Constants.CHUNKNUM_LENGTH+Constants.DIGEST_LENGTH,
-	// (Integer.toString(chunkNum)).getBytes(),0,2);
-	//
-	//
-	// msgidList.add(msgid);
-	// serviceThread.prepareRecv(GlobalVar.hRecvFileControl,GlobalVar.synObjectRecv,
-	// transInfo,complexEvent,msgid,receiverName);
-	//
-	// }
-	// logImpl.info("开始等待"+serviceThreadNum+"个服务线程接收文件:"+receveFileData.desc+"返回!");
-	// int statusValue = complexEvent.WaitForSingleObject(-1);
-	// //开始判断返回的结果
-	// logImpl.info("开始分析"+serviceThreadNum+"个服务线程接收文件:"+receveFileData.desc+"的返回结果!");
-	// boolean successFlag =true;
-	// boolean isThrowException = false;
-	// for (Iterator i = msgidList.iterator(); i.hasNext();)
-	// {
-	// byte[] msgid = (byte[])i.next();
-	//
-	//
-	// synchronized(GlobalVar.synObjectRecv)
-	// {
-	// RecvFileControl recvFileControl =
-	// (RecvFileControl)GlobalVar.hRecvFileControl.get(msgid);
-	// if(recvFileControl.retVal!=0)
-	// {
-	// successFlag = false;
-	// // 3:无法接收文件，因为在相应的队列中不存在相应地控制信息
-	// // * 4:无法接收文件，因为在相应的数据队列中不存在相应地文件数据信息
-	// if(recvFileControl.retVal==3)
-	// {
-	// errorList.add("无法接收文件:"+receveFileData.desc+"! 因为在相应的队列中不存在相应地控制信息.");
-	// File contorlMsgPersistFile = new
-	// File(GlobalVar.tempPath+"/recv/"+ByteBuffer.ByteToHex(msgid));//(new
-	// String(msgid,"ISO-8859-1")));
-	// contorlMsgPersistFile.delete();
-	// GlobalVar.hRecvFileControl.remove(msgid);
-	// }
-	// if(recvFileControl.retVal==4)
-	// {
-	// errorList.add("无法接收文件:"+receveFileData.desc+"!
-	// 因为在相应的数据队列中不存在相应地文件数据信息.");
-	// File contorlMsgPersistFile = new
-	// File(GlobalVar.tempPath+"/recv/"+ByteBuffer.ByteToHex(msgid));//(new
-	// String(msgid,"ISO-8859-1")));
-	// contorlMsgPersistFile.delete();
-	// GlobalVar.hRecvFileControl.remove(msgid);
-	// }
-	// }
-	//
-	// }
-	// }
-	// if(!successFlag)
-	// {
-	// if(GlobalVar.isControlMsgPersist)
-	// {
-	// synchronized(GlobalVar.synObjectRecv)
-	// {
-	// for (Iterator i = msgidList.iterator(); i.hasNext();)
-	// {
-	// byte[] msgid = (byte[])i.next();
-	// File contorlMsgPersistFile = new
-	// File(GlobalVar.tempPath+"/recv/"+ByteBuffer.ByteToHex(msgid));//(new
-	// String(msgid,"ISO-8859-1")));
-	// RandomAccessFile writeAccess1 = new
-	// RandomAccessFile(contorlMsgPersistFile,"rw");
-	// RecvFileControl recvFileControl =
-	// (RecvFileControl)GlobalVar.hRecvFileControl.get(msgid);
-	//
-	// writeAccess1.seek(0);
-	// writeAccess1.write(recvFileControl.packMsgData());
-	// writeAccess1.close();
-	// writeAccess1 = null;
-	//
-	// }
-	// }
-	// }
-	// return null;
-	// }
-	// else
-	// {
-	//
-	// //开始合并文件
-	// synchronized(GlobalVar.synObjectSend)
-	// {
-	//
-	// for (int i=0;i<msgidList.size();i++)
-	// {
-	// byte[] msgid = (byte[])msgidList.get(i);
-	// RecvFileControl recvFileControl =
-	// (RecvFileControl)GlobalVar.hRecvFileControl.get(msgid);
-	// if(i==0)
-	// {
-	// fileName = dirName+"/"+recvFileControl.fileName;
-	// File deleteFile = new File(fileName);
-	// deleteFile.delete();
-	// CommonFun.FileCut(recvFileControl.absoluteFileName,fileName);
-	// }
-	// else
-	// {
-	// //文件追加合并
-	// CommonFun.FileAppend(recvFileControl.absoluteFileName,fileName);
-	// File deleteFile = new File(recvFileControl.absoluteFileName);
-	// deleteFile.delete();
-	// }
-	// }
-	// }
-	// /*for(int i=0;i<serviceThreadNum;i++)
-	// {
-	// byte[] msgid = new byte[24];
-	// ByteBuffer.memset(msgid,(byte)' ');
-	// ByteBuffer.memcpy(msgid,0,receveFileData.msgid,0,Constants.CHUNKNUM_LENGTH+Constants.DIGEST_LENGTH);
-	// //String msgid =
-	// receveFileData.msgid.substring(0,receveFileData.msgid.length()-2);
-	// int chunkNum = 0;
-	// if(serviceThreadNum==1)
-	// chunkNum =0;
-	// else
-	// chunkNum = i+1;
-	// if(Integer.toString(chunkNum).length()<2)
-	// {
-	// ByteBuffer.memcpy(msgid,Constants.CHUNKNUM_LENGTH+Constants.DIGEST_LENGTH,("0"+Integer.toString(chunkNum)).getBytes(),0,2);
-	//
-	// }
-	// else
-	// ByteBuffer.memcpy(msgid,Constants.CHUNKNUM_LENGTH+Constants.DIGEST_LENGTH,(Integer.toString(chunkNum)).getBytes(),0,2);
-	//
-	//
-	//
-	//
-	// }
-	// */
-	// //否则全部删除
-	// synchronized(GlobalVar.synObjectSend)
-	// {
-	// for (Iterator i = msgidList.iterator(); i.hasNext();)
-	// {
-	// byte[] msgid = (byte[])i.next();
-	// File contorlMsgPersistFile = new
-	// File(GlobalVar.tempPath+"/recv/"+ByteBuffer.ByteToHex(msgid));//(new
-	// String(msgid,"ISO-8859-1")));
-	// contorlMsgPersistFile.delete();
-	// GlobalVar.hRecvFileControl.remove(msgid);
-	// }
-	// }
-	// //return iRetVal;
-	// }
-	// }
-	// catch(Exception exc)
-	// {
-	// fileName = null;
-	// logImpl.error("接收文件:"+receveFileData.desc+"出现异常！",exc);
-	// }
-	//
-	// return fileName;
-	// }
+	public String recvFile(ReceveFileData receveFileData, String dirName, String receiverName, TransInfo transInfo,
+			List errorList) {
+		String fileName = null;
+		ComplexEvent complexEvent = null;
+		List serviceThreadList = new LinkedList();
+		try {
+			if (receiverName == null)
+				receiverName = "";
+			int serviceThreadNum = receveFileData.chunkcount, idleServiceThreadNum = 0;
+			ThreadPool threadPool = ThreadPool.getSingleInstance();
+			synchronized (GlobalVar.synObject) {
+				// 没有可用的线程进行服务
+				idleServiceThreadNum = threadPool.getIdleThreadNum();
+				if (idleServiceThreadNum <= 0) {
+					System.out.println("接收文件:" + receveFileData.desc + "出现错误,错误信息:没有可用的线程进行服务!");
+					return null;
+				}
+				// 没有足够的可用线程来启动分块传输，请过段时间重试
+				if (serviceThreadNum > idleServiceThreadNum) {
+					System.out.println("接收文件:" + receveFileData.desc + "出现错误,错误信息:没有足够的可用线程来启动分块传输，请过段时间重试!");
+					return null;
+				}
+				complexEvent = new ComplexEvent(serviceThreadNum);
+				// 开始取出空闲的服务线程出来，以开始进行服务
+				for (int i = 0; i < serviceThreadNum; i++) {
+					ServiceThread serviceThread = threadPool.getIdleServiceThread();
+					serviceThreadList.add(serviceThread);
+				}
+			}
+			// TransInfo transInfo = new TransInfo();
+			List msgidList = new LinkedList();
+			// 开始激发线程
+			System.out.println("开始激发服务线程来接收文件:" + receveFileData.desc + "!");
+			for (int i = 0; i < serviceThreadNum; i++) {
+				ServiceThread serviceThread = (ServiceThread) serviceThreadList.get(i);
+				byte[] msgid = new byte[24];
+				ByteBuffer.memset(msgid, (byte) ' ');
+				ByteBuffer.memcpy(msgid, 0, receveFileData.msgid, 0,
+						Constants.CHUNKNUM_LENGTH + Constants.DIGEST_LENGTH);
+				
+				int chunkNum = 0;
+				if (serviceThreadNum == 1) {
+					chunkNum = 0;
+				} else {
+					chunkNum = i + 1;
+				}
+				if (Integer.toString(chunkNum).length() < 2) {
+					ByteBuffer.memcpy(msgid, Constants.CHUNKNUM_LENGTH + Constants.DIGEST_LENGTH,
+							("0" + Integer.toString(chunkNum)).getBytes(), 0, 2);
+
+				} else {
+					ByteBuffer.memcpy(msgid, Constants.CHUNKNUM_LENGTH + Constants.DIGEST_LENGTH,
+							(Integer.toString(chunkNum)).getBytes(), 0, 2);
+				}
+				msgidList.add(msgid);
+				serviceThread.prepareRecv(GlobalVar.hRecvFileControl, GlobalVar.synObjectRecv, transInfo, complexEvent,
+						msgid, receiverName);
+			}
+			System.out.println("开始等待" + serviceThreadNum + "个服务线程接收文件:" + receveFileData.desc + "返回!");
+			int statusValue = complexEvent.WaitForSingleObject(-1);
+			// 开始判断返回的结果
+			System.out.println("开始分析" + serviceThreadNum + "个服务线程接收文件:" + receveFileData.desc + "的返回结果!");
+			boolean successFlag = true;
+			boolean isThrowException = false;
+			for (Iterator i = msgidList.iterator(); i.hasNext();) {
+				byte[] msgid = (byte[]) i.next();
+
+				synchronized (GlobalVar.synObjectRecv) {
+					RecvFileControl recvFileControl = (RecvFileControl) GlobalVar.hRecvFileControl.get(msgid);
+					if (recvFileControl.retVal != 0) {
+						successFlag = false;
+						// 3:无法接收文件，因为在相应的队列中不存在相应地控制信息
+						// * 4:无法接收文件，因为在相应的数据队列中不存在相应地文件数据信息
+						if (recvFileControl.retVal == 3) {
+							errorList.add("无法接收文件:" + receveFileData.desc + "! 因为在相应的队列中不存在相应地控制信息.");
+							File contorlMsgPersistFile = new File(GlobalVar.tempPath + "/recv/" + ByteBuffer.ByteToHex(msgid));
+							contorlMsgPersistFile.delete();
+							GlobalVar.hRecvFileControl.remove(msgid);
+						}
+						if (recvFileControl.retVal == 4) {
+							errorList.add("无法接收文件:" + receveFileData.desc + "!因为在相应的数据队列中不存在相应地文件数据信息.");
+							File contorlMsgPersistFile = new File(GlobalVar.tempPath + "/recv/" + ByteBuffer.ByteToHex(msgid));
+							contorlMsgPersistFile.delete();
+							GlobalVar.hRecvFileControl.remove(msgid);
+						}
+					}
+				}
+			}
+			if (!successFlag) {
+				if (GlobalVar.isControlMsgPersist) {
+					synchronized (GlobalVar.synObjectRecv) {
+						for (Iterator i = msgidList.iterator(); i.hasNext();) {
+							byte[] msgid = (byte[]) i.next();
+							File contorlMsgPersistFile = new File(GlobalVar.tempPath + "/recv/" + ByteBuffer.ByteToHex(msgid));
+							RandomAccessFile writeAccess1 = new RandomAccessFile(contorlMsgPersistFile, "rw");
+							RecvFileControl recvFileControl = (RecvFileControl) GlobalVar.hRecvFileControl.get(msgid);
+
+							writeAccess1.seek(0);
+							writeAccess1.write(recvFileControl.packMsgData());
+							writeAccess1.close();
+							writeAccess1 = null;
+						}
+					}
+				}
+				return null;
+			} else {
+				// 开始合并文件
+				synchronized (GlobalVar.synObjectSend) {
+
+					for (int i = 0; i < msgidList.size(); i++) {
+						byte[] msgid = (byte[]) msgidList.get(i);
+						RecvFileControl recvFileControl = (RecvFileControl) GlobalVar.hRecvFileControl.get(msgid);
+						if (i == 0) {
+							fileName = dirName + "/" + recvFileControl.fileName;
+							File deleteFile = new File(fileName);
+							deleteFile.delete();
+							CommonFun.FileCut(recvFileControl.absoluteFileName, fileName);
+						} else {
+							// 文件追加合并
+							CommonFun.FileAppend(recvFileControl.absoluteFileName, fileName);
+							File deleteFile = new File(recvFileControl.absoluteFileName);
+							deleteFile.delete();
+						}
+					}
+				}
+				// 否则全部删除
+				synchronized (GlobalVar.synObjectSend) {
+					for (Iterator i = msgidList.iterator(); i.hasNext();) {
+						byte[] msgid = (byte[]) i.next();
+						File contorlMsgPersistFile = new File(GlobalVar.tempPath + "/recv/" + ByteBuffer.ByteToHex(msgid));
+						contorlMsgPersistFile.delete();
+						GlobalVar.hRecvFileControl.remove(msgid);
+					}
+				}
+			}
+		} catch (Exception exc) {
+			fileName = null;
+			System.out.println("接收文件:" + receveFileData.desc + "出现异常！");
+			exc.printStackTrace();
+		}
+		return fileName;
+	}
 }

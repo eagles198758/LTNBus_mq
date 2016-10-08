@@ -50,7 +50,8 @@ public class MqTranSendService {
 		MqChannelPool channelPool = MqChannelPool.getSingleInstance(factory);
 		ctrlChannel = channelPool.getMqChannel(ctrlChannel);
 		try {
-			factory.putData(new MsgDes(), fileTransControlMsg.packMsgData(), ctrlChannel);
+			ctrlChannel.getChannel().basicPublish("", ctrlChannel.getQueueName(), null, fileTransControlMsg.packMsgData());
+//			factory.putData(new MsgDes(), fileTransControlMsg.packMsgData(), ctrlChannel);
 			iRetVal = 0;
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -121,7 +122,8 @@ public class MqTranSendService {
 			ByteBuffer.memcpy(desc, 0, desc1.getBytes(), 0, desc1.getBytes().length);
 			
 			ctrlChannel = channelPool.getMqChannel(ctrlChannel);
-			factory.putData(new MsgDes(), desc, ctrlChannel);
+			ctrlChannel.getChannel().basicPublish("", ctrlChannel.getQueueName(), null, desc);
+//			factory.putData(new MsgDes(), desc, ctrlChannel);
 			iRetVal = 0;
 		} catch (Exception exc) {
 			iRetVal = 2;
@@ -220,10 +222,10 @@ public class MqTranSendService {
 			}
 			// 判断fileTransControlMsg对应的消息是否在"+GlobalVar.fileTransControlQueueName+"队列中存在
 			if (isExistFileTransControlMsg(ctrlChannel)) {
-//				iRetVal = sendFileTransControlMsg(ctrlChannel);
-//				if (iRetVal != 0) {
-//					return iRetVal;
-//				}
+				iRetVal = sendFileTransControlMsg(ctrlChannel);
+				if (iRetVal != 0) {
+					return iRetVal;
+				}
 				if (isExistFileTransControlFinishMsg(feedbackChannel)) {// 存在的话，则表示文件已经传输完毕了 
 					iRetVal = 0;
 					return iRetVal;
@@ -396,9 +398,9 @@ public class MqTranSendService {
 			} catch (Exception exc) {
 				exc.printStackTrace();
 			}
-			channelPool.freeConnection(dataChannel);
-			channelPool.freeConnection(ctrlChannel);
-			channelPool.freeConnection(feedbackChannel);
+			channelPool.freeChannel(dataChannel);
+			channelPool.freeChannel(ctrlChannel);
+			channelPool.freeChannel(feedbackChannel);
 		}
 		return iRetVal;
 	}

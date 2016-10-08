@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.sinux.mq.client.MqConnectionFactory;
 import com.sinux.mq.client.mod.FileTransControlMsg;
+import com.sinux.mq.client.mod.RecvFileControl;
 import com.sinux.mq.client.mod.SendFileControl;
 import com.sinux.mq.client.mod.TransInfo;
 import com.sinux.mq.client.util.ComplexEvent;
@@ -19,9 +20,7 @@ public class ServiceThread extends Thread {
 
 	private Map hSendFileControl = null;
 	private Object synObjectSend = null;
-	@SuppressWarnings("unused")
 	private Map hRecvFileControl = null;
-	@SuppressWarnings("unused")
 	private Object synObjectRecv = null;
 	private FileTransControlMsg fileTransControlMsg = null;
 	private TransInfo transInfo = null;
@@ -29,10 +28,10 @@ public class ServiceThread extends Thread {
 	private int tradeCode = 0;// 1:代表发送 ，2.代表接收
 	private byte[] msgid = null;
 	private boolean isIdle = true;
-//	private String receiverName = null;
+	private String receiverName = null;
 
 	private MqConnectionFactory factory = null;
-	
+
 	public synchronized void setIdleStatus(boolean isIdle) {
 		this.isIdle = isIdle;
 	}
@@ -55,7 +54,7 @@ public class ServiceThread extends Thread {
 			this.transInfo = transInfo;
 			this.tradeCode = 2;
 			this.msgid = msgid;
-//			this.receiverName = receiverName;
+			this.receiverName = receiverName;
 			synObject.notify();
 		}
 	}
@@ -106,32 +105,23 @@ public class ServiceThread extends Thread {
 					}
 				}
 					break;
-				case 2:// 接收
-						// {
-						// MQTranRecvService tranRecvService = new
-						// MQTranRecvService(msgid,transInfo,hRecvFileControl,synObjectRecv);
-						// int iRetVal = tranRecvService.recvFile(receiverName);
-						// synchronized(synObjectRecv)
-						// {
-						// RecvFileControl recvFileControl =
-						// (RecvFileControl)hRecvFileControl.get(msgid);
-						// if(recvFileControl!=null)
-						// {
-						// recvFileControl.retVal = iRetVal;
-						// }
-						//
-						// }
-						// try
-						// {
-						// complexSendEvent.SetEvent();
-						// }
-						// catch(Exception exc)
-						// {
-						// logImpl.error("线程:"+this.getName()+" occur exception
-						// in
-						// notify event,exception info:",exc);
-						// }
-						// }
+				case 2: {// 接收
+					MqTranRecvService tranRecvService = new MqTranRecvService(msgid, transInfo, hRecvFileControl,
+							synObjectRecv,factory);
+					int iRetVal = tranRecvService.recvFile(receiverName);
+					synchronized (synObjectRecv) {
+						RecvFileControl recvFileControl = (RecvFileControl) hRecvFileControl.get(msgid);
+						if (recvFileControl != null) {
+							recvFileControl.retVal = iRetVal;
+						}
+					}
+					try {
+						complexSendEvent.SetEvent();
+					} catch (Exception exc) {
+						System.out.println("线程:" + this.getName() + " occur exception in notify event,exception info:");
+						exc.printStackTrace();
+					}
+				}
 					break;
 				default:
 					break;
