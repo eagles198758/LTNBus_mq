@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	系统参数配置信息
+-->
+<sysparamset>
+	<mqparamset>
+		<!--与MQ服务器的连接配置信息,这个条目不可以存在多个
+	   id:标志这个条目的序号 
+	   connectmethod:连接方式 0:采用进程间通讯方式连接，如果采用此方式的话 程序只能和MQ SERVER放在同一台机器上 1:采用TCP/IP的方式连接
+       queuemanager:要连接的队列管理器名称
+	   hostname:要连接的主机名称
+       port:要连接的端口号
+	   channelname:要连接的通道名称
+	   ccsid:1381
+	   userid:连接MQ的用户ID
+	   password:连接MQ的用户密码
+	   connectionpollnum:连接此个条目对应队列管理器的连接池的中的最大数目
+	   timeout:在此个条目对应队列管理器的连接池的中空闲连接的超时时间，超过此时间连接将被清除掉 分钟为单位
+	    -->
+		<mqconinfo id="1" connectmethod="1" queuemanager="TESTQM" hostname="tongjingwen" port="1414" channelname="SYSTEM.ADMIN.SVRCONN" ccsid="1381"  userid="" password="" connectionpollnum="5" timeout="10" />
+		<!--是否启动连接清除线程0:不启动 1:启动-->
+		<startpurgethread>1</startpurgethread>
+		<!--连接清除线程启动间隔时间，即每隔多少时间启动一次 单位为分钟-->
+		<purgethreadruninterval>1</purgethreadruninterval>
+	</mqparamset>
+	<!--线程池容纳线程的最大数目，数目扩大主要是为了大文件分块并发传输用 -->
+	<threadpoolnum>100</threadpoolnum>
+    <transparamset>
+	    <!--MQ消息传输是否启用持久化，如果为了追求最高的传输效率的话不启用-->
+		<msgpersist>1</msgpersist>	<!--程序在内存中的控制信息是否持久化，如果为了追求最高的传输效率的话不启用，但是出现程序突然宕机的话，将不会从失败的那一点开始传输-->
+		<controlmsgpersist>0</controlmsgpersist>
+        <!-- 当传输文件的时候，程序将从文件读取msgsize这个大小的内容，做为MQ消息的数据区打入MQ中,以K为单位-->
+		<msgsize>32</msgsize>
+		<!--对于大 文件可能会启用分块传输机制，即是启动多个线程并行的传输
+		   isstart:是否启动，0:不启动 1:启动
+		   //filesize:在isstart标志设为启动的状态的情况下，多大的文件才需要启用分块传输机制,以K为单位
+		   chunknum:分成多少块传输，数目最好小于等于threadpoolnum的值
+		-->
+		<chunktransparamset isstart="1" filesize="10240" chunknum="2"/>
+		<!--文件数据将打入哪个队列中-->
+		<queuename>.TRANS.FILEDATA</queuename>
+		<!--文件传输控制消息将打入哪个队列中-->
+		<filetranscontorlqueuename>.FILETRANS.CONTROL</filetranscontorlqueuename>
+		<!--文件完成消息将打入哪个队列中-->
+		<filetranscontorlfinishqueuename>.FILETRANS.CONTROL.FINISH</filetranscontorlfinishqueuename>
+	</transparamset>
+	<!--系统需要的临时目录-->
+	<temppath>f:\temp</temppath>
+</sysparamset>
