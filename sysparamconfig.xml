@@ -45,5 +45,5 @@
 		<filetranscontorlfinishqueuename>.FILETRANS.CONTROL.FINISH</filetranscontorlfinishqueuename>
 	</transparamset>
 	<!--系统需要的临时目录-->
-	<temppath>E:\temp</temppath>
+	<temppath>F:\temp</temppath>
 </sysparamset>

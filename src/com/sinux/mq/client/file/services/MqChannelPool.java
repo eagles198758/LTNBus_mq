@@ -34,10 +34,10 @@ public class MqChannelPool {
 	public synchronized static MqChannelPool getSingleInstance(MqConnectionFactory connectionfactory) {
 		if (channelPool == null) {
 			channelPool = new MqChannelPool();
-//			if (GlobalVar.isStartPurgeThread) {// 启动连接清除线程
-//				PurgeChannelPoolThread purgePoolThread = PurgeChannelPoolThread.getSingleInstance(connectionfactory);
-//				purgePoolThread.start();// 开始启动了
-//			}
+			if (GlobalVar.isStartPurgeThread) {// 启动连接清除线程
+				PurgeChannelPoolThread purgePoolThread = PurgeChannelPoolThread.getSingleInstance(connectionfactory);
+				purgePoolThread.start();// 开始启动了
+			}
 			try {
 				GlobalVar.notifyPurgeThreadThreadEvent.SetEvent();
 			} catch (Exception exc) {

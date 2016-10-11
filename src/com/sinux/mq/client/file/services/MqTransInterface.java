@@ -41,7 +41,7 @@ public class MqTransInterface {
 		int iRetVal = 0;
 		List serviceThreadList = new LinkedList();
 		try {
-			// System.out.println("开始准备文件:"+absolutFileName+"发送的前期准备工作!");
+			System.out.println("开始准备文件:" + absolutFileName + "发送的前期准备工作!");
 			File oFile = new File(absolutFileName);
 			if (!oFile.exists()) {
 				return -2;
@@ -82,7 +82,7 @@ public class MqTransInterface {
 					serviceThreadList.add(serviceThread);
 				}
 			}
-			// System.out.println("开始计算文件:"+absolutFileName+"的SHA值!");
+			System.out.println("开始计算文件:" + absolutFileName + "的SHA值!");
 			InetAddress inetAddress = InetAddress.getLocalHost();
 			String hostName = inetAddress.getHostName();
 			String hostAddress = inetAddress.getHostAddress();
@@ -97,7 +97,7 @@ public class MqTransInterface {
 			ByteBuffer.memcpy(shaValueBytes, Constants.CHUNKNUM_LENGTH, shaValueTmp, 0, Constants.DIGEST_LENGTH);// shaValueTmp.length);
 
 			// 开始准备传输
-			// System.out.println("开始准备文件:"+absolutFileName+"的传输!");
+			System.out.println("开始准备文件:" + absolutFileName + "的传输!");
 			List fileTransControlMsgList = new LinkedList();
 			List msgidList = new LinkedList();
 			long offsetFile = 0;
@@ -115,22 +115,22 @@ public class MqTransInterface {
 					fileTransControlMsg.fileName = fileName;
 					fileTransControlMsg.hostName = hostName;
 					fileTransControlMsg.ipAddress = hostAddress;
-					if (i == 0)
+					if (i == 0) {
 						offsetFile = 0;
-					else
+					} else {
 						offsetFile += chunkSize;
-
+					}
 					fileTransControlMsg.offsetFile = Long.toString(offsetFile);
 					if (i == (serviceThreadNum - 1)) {
 						fileTransControlMsg.dataSize = Long.toString(chunkSize + mod);
-					} else
+					} else {
 						fileTransControlMsg.dataSize = Long.toString(chunkSize);
-
+					}
 					if (receiverName == null) {
 						fileTransControlMsg.receiverName = "";
-					} else
+					} else {
 						fileTransControlMsg.receiverName = receiverName;
-
+					}
 					fileTransControlMsg.tradeCode = "";
 					fileTransControlMsg.queueName = GlobalVar.queueName;
 					fileTransControlMsgList.add(fileTransControlMsg);
@@ -156,10 +156,8 @@ public class MqTransInterface {
 				fileTransControlMsgList.add(fileTransControlMsg);
 			}
 			// 开始激发线程
-			// System.out.println("开始激发服务线程来传输文件:"+absolutFileName+"!");
+			System.out.println("开始激发服务线程来传输文件:" + absolutFileName + "!");
 			for (int i = 0; i < serviceThreadNum; i++) {
-				// byte[] msgid = new byte[24];
-				// ByteBuffer.memset(msgid, (byte) ' ');
 				ServiceThread serviceThread = (ServiceThread) serviceThreadList.get(i);
 				FileTransControlMsg fileTransControlMsg = (FileTransControlMsg) fileTransControlMsgList.get(i);
 				if (fileTransControlMsg.chunkNum.length() < Constants.CHUNKNUM_LENGTH) {
@@ -211,6 +209,9 @@ public class MqTransInterface {
 						GlobalVar.hSendFileControl.remove(msgid);
 					}
 				}
+				System.out.println("文件传输成功!");
+				GlobalVar.isRun = false;
+				threadPool.shutdown();
 				return iRetVal;
 			}
 		} catch (Exception exc) {
@@ -254,7 +255,7 @@ public class MqTransInterface {
 			}
 			List msgidList = new LinkedList();
 			// 开始激发线程
-			System.out.println("开始激发服务线程来接收文件:" + "!");
+			System.out.println("开始激发服务线程来接收文件!");
 			for (int i = 0; i < serviceThreadNum; i++) {
 				ServiceThread serviceThread = (ServiceThread) serviceThreadList.get(i);
 				byte[] msgid = new byte[24];
@@ -278,10 +279,10 @@ public class MqTransInterface {
 				serviceThread.prepareRecv(GlobalVar.hRecvFileControl, GlobalVar.synObjectRecv, transInfo, complexEvent,
 						msgid, receiverName, this.factory);
 			}
-			System.out.println("开始等待" + serviceThreadNum + "个服务线程接收文件:" + "返回!");
+			System.out.println("开始等待" + serviceThreadNum + "个服务线程接收文件返回!");
 			complexEvent.WaitForSingleObject(-1);
 			// 开始判断返回的结果
-			System.out.println("开始分析" + serviceThreadNum + "个服务线程接收文件:" + "的返回结果!");
+			System.out.println("开始分析" + serviceThreadNum + "个服务线程接收文件的返回结果!");
 			boolean successFlag = true;
 			for (Iterator i = msgidList.iterator(); i.hasNext();) {
 				byte[] msgid = (byte[]) i.next();
@@ -293,14 +294,14 @@ public class MqTransInterface {
 						// 3:无法接收文件，因为在相应的队列中不存在相应地控制信息
 						// * 4:无法接收文件，因为在相应的数据队列中不存在相应地文件数据信息
 						if (recvFileControl.retVal == 3) {
-							errorList.add("无法接收文件:" + "! 因为在相应的队列中不存在相应地控制信息.");
+							errorList.add("无法接收文件! 因为在相应的队列中不存在相应地控制信息.");
 							File contorlMsgPersistFile = new File(
 									GlobalVar.tempPath + "/recv/" + ByteBuffer.ByteToHex(msgid));
 							contorlMsgPersistFile.delete();
 							GlobalVar.hRecvFileControl.remove(msgid);
 						}
 						if (recvFileControl.retVal == 4) {
-							errorList.add("无法接收文件:" + "!因为在相应的数据队列中不存在相应地文件数据信息.");
+							errorList.add("无法接收文件因为在相应的数据队列中不存在相应地文件数据信息.");
 							File contorlMsgPersistFile = new File(
 									GlobalVar.tempPath + "/recv/" + ByteBuffer.ByteToHex(msgid));
 							contorlMsgPersistFile.delete();
@@ -358,9 +359,11 @@ public class MqTransInterface {
 					}
 				}
 			}
+			GlobalVar.isRun = false;
+			threadPool.shutdown();
 		} catch (Exception exc) {
 			fileName = null;
-			System.out.println("接收文件:" + "出现异常！");
+			System.out.println("接收文件出现异常！");
 			exc.printStackTrace();
 		}
 		return fileName;
@@ -381,4 +384,24 @@ public class MqTransInterface {
 		}
 		return null;
 	}
+	
+//	private void isFileControlMsg(String receiverName) {
+//		MqChannel channel = factory.openChannel(receiverName + GlobalVar.fileTransControlQueueName, false, false);
+//		try {
+//			QueueingConsumer consumer = new QueueingConsumer(channel.getChannel());
+//			channel.getChannel().basicConsume(channel.getQueueName(), true, consumer);
+//			while(GlobalVar.isRun){
+//				QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+//				delivery.getBody();
+//			}
+//		} catch (ShutdownSignalException | ConsumerCancelledException | InterruptedException | IOException e) {
+//			e.printStackTrace();
+//		} finally {
+//			try {
+//				channel.getChannel().close();
+//			} catch (IOException | TimeoutException e) {
+//				e.printStackTrace();
+//			}
+//		}
+//	}
 }

@@ -1,9 +1,15 @@
 package com.sinux.mq.client.example.p2p;
 
+import java.io.IOException;
+
+import com.rabbitmq.client.ConsumerCancelledException;
+import com.rabbitmq.client.QueueingConsumer;
+import com.rabbitmq.client.ShutdownSignalException;
 import com.sinux.mq.client.MqChannel;
 import com.sinux.mq.client.MqConnectionFactory;
 import com.sinux.mq.client.MqConsumer;
 import com.sinux.mq.client.mod.MsgDes;
+import com.sinux.mq.client.util.ByteArrayutil;
 
 public class recv_example {
 	public static final String host = "localhost";//"192.168.0.105"
@@ -37,7 +43,31 @@ public class recv_example {
 		factory.getData(consumer);
 	}
 	
+	public static void recv1(){
+		//构造连接工厂类
+		MqConnectionFactory factory = new MqConnectionFactory(host, port, userName, passWord);
+		//初始化工厂类，创建连接
+		factory.initMq();
+		//获取通道
+		MqChannel channel = factory.openChannel(queueName, false, false);
+		//构造consumer对象，实现handleDeliver()，以获取消息
+		QueueingConsumer consumer = new QueueingConsumer(channel.getChannel());
+		try {
+			channel.getChannel().basicConsume(queueName, true, consumer);
+			while(true){
+				QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+				byte[] body = delivery.getBody();
+				byte[] msg = new byte[12];
+				byte[] msgDes = new byte[body.length - 12];
+				ByteArrayutil.split(body, msgDes, msg);
+				System.out.println(new String(msg));
+			}
+		} catch (IOException | ShutdownSignalException | ConsumerCancelledException | InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	public static void main(String[] args) {
-		recv();
+		recv1();
 	}
 }

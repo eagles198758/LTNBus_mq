@@ -1,6 +1,7 @@
 package com.sinux.mq.client.file.services;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,32 +40,29 @@ public class MqTranRecvService {
 	}
 
 	// 删除recvFileControl对应的多余无用的消息
-	private int deleteInvalidControlInfoFromQueue(MqChannel channel) {
-		int iRetVal = 0;
-		MqChannel ctrlChannel = new MqChannel();
-		ctrlChannel.setQueueName(channel.getQueueName() + GlobalVar.fileTransControlQueueName);
-		ctrlChannel = channelPool.getMqChannel(ctrlChannel);
-		try {
-			if (ctrlChannel.getChannel().messageCount(ctrlChannel.getQueueName()) > 0) {
-				ctrlChannel.getChannel().queuePurge(ctrlChannel.getQueueName());
-			}
-		} catch (Exception e) {
-			iRetVal = -1;
-			e.printStackTrace();
-		}
-		return iRetVal;
-	}
+//	private int deleteInvalidControlInfoFromQueue(MqChannel channel) {
+//		int iRetVal = 0;
+//		MqChannel ctrlChannel = new MqChannel();
+//		ctrlChannel.setQueueName(channel.getQueueName() + GlobalVar.fileTransControlQueueName);
+//		ctrlChannel = channelPool.getMqChannel(ctrlChannel);
+//		if(!ctrlChannel.getChannel().isOpen()){
+//			return iRetVal;
+//		}
+//		try {
+//			if (ctrlChannel.getChannel().messageCount(ctrlChannel.getQueueName()) <= 0) {
+//				ctrlChannel.getChannel().queueDelete(ctrlChannel.getQueueName());
+//				ctrlChannel.getChannel().close();
+//			} 
+//		} catch (Exception e) {
+//			iRetVal = -1;
+//			e.printStackTrace();
+//		}
+//		return iRetVal;
+//	}
 
-	private void delInvalidMsgInfo(MqChannel channel, String queueName) throws Exception {
+	private void delInvalidMsgInfo(MqChannel channel) throws Exception {
 		channel = channelPool.getMqChannel(channel);
-		try {
-			if (channel.getChannel().messageCount(channel.getQueueName()) > 0) {
-				channel.getChannel().queuePurge(channel.getQueueName());
-			}
-			channel.getChannel().queueDelete(channel.getQueueName());
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		channel.getChannel().queueDelete(channel.getQueueName());
 	}
 
 	/*
@@ -73,7 +71,7 @@ public class MqTranRecvService {
 	 */
 	// 从"+GlobalVar.fileTransControlFinishQueueName+"队列和"+GlobalVar.fileTransControlQueueName+"队列中取得相应地信息
 	@SuppressWarnings("unchecked")
-	private int getControlInfoFromQueue(String receiverName, RecvFileControl recvFileControl) {
+	private int getControlInfoFromQueue(String receiverName, RecvFileControl recvFileControl) throws IOException {
 		int iRetVal = 0;
 		MqChannel ctrlChannel = new MqChannel();
 		ctrlChannel.setQueueName(receiverName + GlobalVar.fileTransControlQueueName);
@@ -184,8 +182,8 @@ public class MqTranRecvService {
 
 			if (recvFileControl.isFinished) {// 已经接收完毕了.不需要再接收了
 				transInfo.setTotalReceivedSize(recvFileControl.recvedDataSize);
-				delInvalidMsgInfo(channel, recvFileControl.queueName);
-				iRetVal = deleteInvalidControlInfoFromQueue(channel);
+				delInvalidMsgInfo(channel);
+//				iRetVal = deleteInvalidControlInfoFromQueue(channel);
 				if (iRetVal == 0) {
 					// 删除此文件
 					contorlMsgPersistFile = new File(GlobalVar.tempPath + "/recv/" + ByteBuffer.ByteToHex(msgid));
@@ -239,9 +237,13 @@ public class MqTranRecvService {
 				try {
 					startTime = System.currentTimeMillis();
 					response = dataChannel.getChannel().basicGet(dataChannel.getQueueName(), true);
-					headers = response.getProps().getHeaders();
-					msgDataSize = (byte[]) headers.get("msgDataSize");
-					fileOffset = (byte[]) headers.get("fileOffset");
+					if(response != null){
+						headers = response.getProps().getHeaders();
+						msgDataSize = (byte[]) headers.get("msgDataSize");
+						fileOffset = (byte[]) headers.get("fileOffset");
+					} else {
+						return iRetVal = -1;
+					}
 				} catch (Exception exc) {
 					recvFileControl.recvedSegNum--;
 					exc.printStackTrace();
@@ -262,7 +264,7 @@ public class MqTranRecvService {
 					writeAccess1.write(recvFileControl.packMsgData());
 				}
 			}
-			System.out.println(Thread.currentThread().getName() + "临时文件写入成功！");
+			System.out.println(Thread.currentThread().getName() + "临时文件" + recvFileControl.chunkFileName + "写入成功！");
 
 			recvFileControl.isFinished = true;
 
@@ -274,9 +276,9 @@ public class MqTranRecvService {
 				writeAccess1.write(recvFileControl.packMsgData());
 			}
 			// 删除数据队列多于的信息
-			delInvalidMsgInfo(dataChannel, recvFileControl.queueName);
+			delInvalidMsgInfo(dataChannel);
 			// 删除recvFileControl对应的多余无用的消息
-			iRetVal = deleteInvalidControlInfoFromQueue(channel);
+//			iRetVal = deleteInvalidControlInfoFromQueue(channel);
 
 			GlobalVar.tempFilePath = fileTmp.getPath();
 		} catch (Exception e) {

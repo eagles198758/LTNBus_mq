@@ -8,8 +8,7 @@ public class sendF_example {
 	public static String userName = "test";//"sinux"
 	public static String passWord = "test";//"sinux123"
 	
-	public static String inputFilePath = "E:/docs/mq/TLQ²âÊÔÇé¿ö.docx";
-	public static String queueName = "file";
+	public static String inputFilePath = "J:/Downloads/git.rar";
 	
 	public static void send(){
 		MqConnectionFactory factory = new MqConnectionFactory(host, port, userName, passWord);

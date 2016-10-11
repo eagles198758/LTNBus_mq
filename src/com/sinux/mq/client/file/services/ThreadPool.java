@@ -64,4 +64,11 @@ public class ThreadPool {
 	public synchronized int getIdleThreadNum() {
 		return pool.size();
 	}
+	
+	public synchronized void shutdown() {
+		for(Iterator i = pool.iterator(); i.hasNext();){
+			ServiceThread serviceThread = (ServiceThread) i.next();
+			serviceThread.interrupt();
+		}
+	}
 }

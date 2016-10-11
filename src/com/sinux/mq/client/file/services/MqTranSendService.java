@@ -69,7 +69,7 @@ public class MqTranSendService {
 	}
 
 	// 判断fileTransControlMsg对应的消息是否在"+GlobalVar.fileTransControlQueueName+".FINISH队列中存在
-	private boolean isExistFileTransControlFinishMsg(MqChannel feedbackChannel) {
+	private boolean isExistFileTransControlFinishMsg(MqChannel feedbackChannel) throws IOException {
 		boolean bRetVal = false;
 		feedbackChannel = channelPool.getMqChannel(feedbackChannel);
 		try {
@@ -77,7 +77,7 @@ public class MqTranSendService {
 			if(response != null){
 				RecvFileControl recvFileControl = new RecvFileControl();
 				recvFileControl.unPackMsgData(response.getBody());
-				System.out.println("成功收取文件" + recvFileControl.absoluteFileName + "中的" + recvFileControl.chunkFileName + "包");
+				System.out.println("成功收取文件" + recvFileControl.absoluteFileName);
 				bRetVal = true;
 			}
 		} catch (Exception e) {
@@ -177,14 +177,10 @@ public class MqTranSendService {
 			// 判断fileTransControlMsg对应的消息是否在"+GlobalVar.fileTransControlQueueName+"队列中存在
 			if (isExistFileTransControlMsg(ctrlChannel)) {
 				iRetVal = sendFileTransControlMsg(ctrlChannel);
+				System.out.println(Thread.currentThread().getName() + "正确发送文件传输控制信息！");
 				if (iRetVal != 0) {
 					return iRetVal;
 				}
-				// if (isExistFileTransControlFinishMsg(feedbackChannel)) {//
-				// 存在的话，则表示文件已经传输完毕了
-				// iRetVal = 0;
-				// return iRetVal;
-				// }
 				if (Long.parseLong(fileTransControlMsg.dataSize) == sendFileControl.sendedDataSize) {
 					transInfo.setTotalSendedSize(sendFileControl.sendedDataSize);
 					transInfo.setTotalFinishedSize(sendFileControl.sendedDataSize);
@@ -206,6 +202,7 @@ public class MqTranSendService {
 
 				// 发送文件传输控制消息到"+GlobalVar.fileTransControlQueueName+"队列中
 				iRetVal = sendFileTransControlMsg(ctrlChannel);
+				System.out.println(Thread.currentThread().getName() + "正确发送文件传输控制信息！");
 				if (iRetVal != 0) {
 					return iRetVal;
 				}
@@ -236,6 +233,7 @@ public class MqTranSendService {
 
 			BasicProperties.Builder builder = new BasicProperties.Builder();
 			Map<String, Object> headers = new HashMap<String, Object>();
+			System.out.println(Thread.currentThread().getName() + "开始发送文件到MQ服务器！");
 			while (sendFileControl.sendedDataSize != transFileDataSize) {// 循环发送数据
 
 				sendDataLength = (int) (transFileDataSize - sendFileControl.sendedDataSize);
@@ -283,7 +281,7 @@ public class MqTranSendService {
 				}
 				headers.clear();
 			}
-
+			System.out.println(Thread.currentThread().getName() + "文件" + fileTransControlMsg.chunkFileName + "发送成功！");
 			// 发送文件已经传输完毕的消息到MQ中成功
 			if (iRetVal == 0) {
 				sendFileControl.isFinished = true;
@@ -299,6 +297,7 @@ public class MqTranSendService {
 				channelPool.destoryAllChannel();
 			}
 			while(!isExistFileTransControlFinishMsg(feedbackChannel)){
+				Thread.sleep(1000);
 			}
 		} catch (Exception exc) {
 			exc.printStackTrace();

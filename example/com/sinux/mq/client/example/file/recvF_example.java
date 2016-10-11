@@ -8,9 +8,8 @@ public class recvF_example {
 	public static String userName = "test";// "sinux"
 	public static String passWord = "test";// "sinux123"
 
-	public static String outputFilePath = "E:/trans";
-	public static String recvFileName = "TLQ²âÊÔÇé¿ö.docx";
-	public static String queueName = "file";
+	public static String outputFilePath = "F:/trans";
+	public static String recvFileName = "git.rar";
 
 	public static void recv() {
 		MqConnectionFactory factory = new MqConnectionFactory(host, port, userName, passWord);
