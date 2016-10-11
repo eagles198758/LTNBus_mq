@@ -24,7 +24,7 @@
 		<purgethreadruninterval>1</purgethreadruninterval>
 	</mqparamset>
 	<!--线程池容纳线程的最大数目，数目扩大主要是为了大文件分块并发传输用 -->
-	<threadpoolnum>100</threadpoolnum>
+	<threadpoolnum>10</threadpoolnum>
     <transparamset>
 	    <!--MQ消息传输是否启用持久化，如果为了追求最高的传输效率的话不启用-->
 		<msgpersist>1</msgpersist>	<!--程序在内存中的控制信息是否持久化，如果为了追求最高的传输效率的话不启用，但是出现程序突然宕机的话，将不会从失败的那一点开始传输-->
@@ -36,7 +36,7 @@
 		   //filesize:在isstart标志设为启动的状态的情况下，多大的文件才需要启用分块传输机制,以K为单位
 		   chunknum:分成多少块传输，数目最好小于等于threadpoolnum的值
 		-->
-		<chunktransparamset isstart="1" filesize="10240" chunknum="2"/>
+		<chunktransparamset isstart="1" filesize="10240" chunknum="5"/>
 		<!--文件数据将打入哪个队列中-->
 		<queuename>.TRANS.FILEDATA</queuename>
 		<!--文件传输控制消息将打入哪个队列中-->
@@ -45,5 +45,5 @@
 		<filetranscontorlfinishqueuename>.FILETRANS.CONTROL.FINISH</filetranscontorlfinishqueuename>
 	</transparamset>
 	<!--系统需要的临时目录-->
-	<temppath>f:\temp</temppath>
+	<temppath>E:\temp</temppath>
 </sysparamset>

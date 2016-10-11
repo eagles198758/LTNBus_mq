@@ -1,6 +1,7 @@
 package com.sinux.mq.client.file.services;
 
 import java.util.*;
+
 import com.sinux.mq.client.MqChannel;
 import com.sinux.mq.client.MqConnectionFactory;
 
@@ -26,7 +27,7 @@ public class MqChannelPool {
 	}
 
 	private MqChannel addMqChannel(String queueName) {
-		return factory.openChannel(queueName, true, false);
+		return factory.openChannel(queueName, false, false);
 	}
 
 	// 通过此方法获得队列池实例，从而实现单根模型
@@ -132,7 +133,6 @@ public class MqChannelPool {
 							if (!channel.getChannel().isOpen()) {
 								channel.setUseTime(System.currentTimeMillis());
 								channel.setUse(true);
-								flag = false;
 							} else {
 								channel.setFreeTime(0);// 清除线程启动时候将会把这个给清除掉
 								channel.setUse(false);

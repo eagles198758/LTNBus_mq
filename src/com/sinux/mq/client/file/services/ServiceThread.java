@@ -46,7 +46,7 @@ public class ServiceThread extends Thread {
 
 	// 激发服务线程开始接收
 	public void prepareRecv(Map hRecvFileControl, Object synObjectRecv, TransInfo transInfo, ComplexEvent complexEvent,
-			byte[] msgid, String receiverName) {
+			byte[] msgid, String receiverName, MqConnectionFactory factory) {
 		synchronized (synObject) {
 			this.complexSendEvent = complexEvent;
 			this.hRecvFileControl = hRecvFileControl;
@@ -55,6 +55,7 @@ public class ServiceThread extends Thread {
 			this.tradeCode = 2;
 			this.msgid = msgid;
 			this.receiverName = receiverName;
+			this.factory = factory;
 			synObject.notify();
 		}
 	}
@@ -106,6 +107,7 @@ public class ServiceThread extends Thread {
 				}
 					break;
 				case 2: {// 接收
+					System.out.println(Thread.currentThread().getName() + "已唤醒！");
 					MqTranRecvService tranRecvService = new MqTranRecvService(msgid, transInfo, hRecvFileControl,
 							synObjectRecv,factory);
 					int iRetVal = tranRecvService.recvFile(receiverName);

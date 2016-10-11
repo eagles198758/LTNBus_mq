@@ -171,7 +171,6 @@ public class CommonFun
         RandomAccessFile oSrcStream = null,oDesStream = null;
 
         int  NORMALBUFSIZE = 1024*1024;//64K×Ö½Ú
-        int  iBufSize;
         int ret = 0;
         oSrcFile = new File(sSrcFile);
        
@@ -237,6 +236,9 @@ public class CommonFun
         if(!oSrcFile.exists())
             return false;
         oDesFile = new File(sDesFile);
+        if(!oDesFile.getParentFile().exists()){
+        	oDesFile.getParentFile().mkdirs();
+        }
         return oSrcFile.renameTo(oDesFile);
     }
     
@@ -379,10 +381,9 @@ public class CommonFun
   public static void Deldir(String sPath)
   {
       String sFilepath = "";
-      String sFilename="";
       File oFile=null,oTmpFile=null;
       File oFiles[]=null;
-      int iCount=0,i=0,j=0;
+      int iCount=0,i=0;
       try
       {
           oFile = new File(sPath);

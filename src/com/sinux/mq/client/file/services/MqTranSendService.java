@@ -3,15 +3,21 @@ package com.sinux.mq.client.file.services;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import com.rabbitmq.client.AMQP.BasicProperties;
+import com.rabbitmq.client.Consumer;
+import com.rabbitmq.client.GetResponse;
+import com.rabbitmq.client.QueueingConsumer;
 import com.sinux.mq.client.MqChannel;
 import com.sinux.mq.client.MqConnectionFactory;
 import com.sinux.mq.client.MqConsumer;
 import com.sinux.mq.client.mod.Constants;
 import com.sinux.mq.client.mod.FileTransControlMsg;
 import com.sinux.mq.client.mod.MsgDes;
+import com.sinux.mq.client.mod.RecvFileControl;
 import com.sinux.mq.client.mod.SendFileControl;
 import com.sinux.mq.client.mod.TransInfo;
 import com.sinux.mq.client.util.ByteBuffer;
@@ -19,7 +25,7 @@ import com.sinux.mq.client.util.ByteBuffer;
 /**
  * @author jingwen.tong 2006-12-18 Copyright IBM 2005 利用MQ消息完成断点上传的实现类
  */
-@SuppressWarnings({"rawtypes","unused"})
+@SuppressWarnings({ "rawtypes", "unused" })
 public class MqTranSendService {
 
 	private FileTransControlMsg fileTransControlMsg = null;
@@ -30,6 +36,7 @@ public class MqTranSendService {
 	public Object synObjectTrans = null;
 
 	private MqConnectionFactory factory = null;
+	private MqChannelPool channelPool = null;
 
 	public MqTranSendService(byte[] msgid, FileTransControlMsg fileTransControlMsg, TransInfo transInfo,
 			Map hSendFileControl, Object synObjectTrans, MqConnectionFactory factory) {
@@ -40,6 +47,7 @@ public class MqTranSendService {
 		this.hSendFileControl = hSendFileControl;
 		this.synObjectTrans = synObjectTrans;
 		this.factory = factory;
+		this.channelPool = MqChannelPool.getSingleInstance(factory);
 	}
 
 	/*
@@ -47,11 +55,12 @@ public class MqTranSendService {
 	 */
 	private int sendFileTransControlMsg(MqChannel ctrlChannel) {
 		int iRetVal = -1;
-		MqChannelPool channelPool = MqChannelPool.getSingleInstance(factory);
 		ctrlChannel = channelPool.getMqChannel(ctrlChannel);
+		BasicProperties.Builder builder = new BasicProperties.Builder();
+		builder.messageId(new String(msgid));
 		try {
-			ctrlChannel.getChannel().basicPublish("", ctrlChannel.getQueueName(), null, fileTransControlMsg.packMsgData());
-//			factory.putData(new MsgDes(), fileTransControlMsg.packMsgData(), ctrlChannel);
+			ctrlChannel.getChannel().basicPublish("", ctrlChannel.getQueueName(), builder.build(),
+					fileTransControlMsg.packMsgData());
 			iRetVal = 0;
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -62,74 +71,24 @@ public class MqTranSendService {
 	// 判断fileTransControlMsg对应的消息是否在"+GlobalVar.fileTransControlQueueName+".FINISH队列中存在
 	private boolean isExistFileTransControlFinishMsg(MqChannel feedbackChannel) {
 		boolean bRetVal = false;
-		MqChannelPool channelPool = MqChannelPool.getSingleInstance(factory);
-		if(!channelPool.isExistMqChannel(feedbackChannel)){
-			feedbackChannel = channelPool.getMqChannel(feedbackChannel);
-		}
-		MqConsumer consumer = new MqConsumer(12, feedbackChannel) {
-			
-			@Override
-			public void handleDeliver(byte[] body, byte[] msgDes) {
-				String bodyStr = new String(body);
-				if(body.equals("OK")){
-					System.out.println(bodyStr);
-					return;
-				}
+		feedbackChannel = channelPool.getMqChannel(feedbackChannel);
+		try {
+			GetResponse response = feedbackChannel.getChannel().basicGet(feedbackChannel.getQueueName(), true);
+			if(response != null){
+				RecvFileControl recvFileControl = new RecvFileControl();
+				recvFileControl.unPackMsgData(response.getBody());
+				System.out.println("成功收取文件" + recvFileControl.absoluteFileName + "中的" + recvFileControl.chunkFileName + "包");
+				bRetVal = true;
 			}
-		};
-		factory.getData(consumer);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 		return bRetVal;
 	}
 
 	// 判断fileTransControlMsg对应的消息是否在"+GlobalVar.fileTransControlQueueName+"队列中存在
 	private boolean isExistFileTransControlMsg(MqChannel ctrlChannel) {
-		MqChannelPool channelPool = MqChannelPool.getSingleInstance(factory);
 		return channelPool.isExistMqChannel(ctrlChannel);
-	}
-
-	// 发送文件已经传输完毕的消息到MQ中成功，以触发接收接口触发以开始接收文件
-	private int sendFileTransFinishedMsg(MqChannel ctrlChannel) {
-		int iRetVal = -1;
-		MqChannelPool channelPool = MqChannelPool.getSingleInstance(factory);
-		try {
-			File sendFile = new File(fileTransControlMsg.dirName + "/" + fileTransControlMsg.fileName);
-			long fileLength = 0;
-			if (sendFile.exists()) {
-				fileLength = sendFile.length();
-			}
-			// 消息体打入一些描述信息
-			byte chunkCount[] = new byte[Constants.CHUNKCOUNT_LENGTH];
-			byte chunkNum[] = new byte[Constants.CHUNKNUM_LENGTH];
-			byte tradeCode[] = new byte[Constants.TRADECODE_LENGTH];
-			byte fileLength1[] = new byte[Constants.SENDEDDATASIZE_LENGTH];
-			ByteBuffer.memset(tradeCode, (byte) ' ');
-			ByteBuffer.memset(chunkCount, (byte) ' ');
-			ByteBuffer.memset(chunkNum, (byte) ' ');
-			ByteBuffer.memset(fileLength1, (byte) ' ');
-			ByteBuffer.memcpy(chunkCount, 0, fileTransControlMsg.chunkCount.getBytes(), 0,
-					fileTransControlMsg.chunkCount.getBytes().length);
-			ByteBuffer.memcpy(chunkNum, 0, fileTransControlMsg.chunkNum.getBytes(), 0,
-					fileTransControlMsg.chunkNum.getBytes().length);
-			ByteBuffer.memcpy(tradeCode, 0, fileTransControlMsg.tradeCode.getBytes(), 0,
-					fileTransControlMsg.tradeCode.getBytes().length);
-			ByteBuffer.memcpy(fileLength1, 0, Long.toString(fileLength).getBytes(), 0,
-					Long.toString(fileLength).getBytes().length);
-
-			byte desc[] = new byte[Constants.DESC_LENGTH];
-			ByteBuffer.memset(desc, (byte) ' ');
-			String desc1 = fileTransControlMsg.hostName + ":" + fileTransControlMsg.ipAddress + ":"
-					+ fileTransControlMsg.fileName;
-			ByteBuffer.memcpy(desc, 0, desc1.getBytes(), 0, desc1.getBytes().length);
-			
-			ctrlChannel = channelPool.getMqChannel(ctrlChannel);
-			ctrlChannel.getChannel().basicPublish("", ctrlChannel.getQueueName(), null, desc);
-//			factory.putData(new MsgDes(), desc, ctrlChannel);
-			iRetVal = 0;
-		} catch (Exception exc) {
-			iRetVal = 2;
-			channelPool.destoryAllChannel();
-		}
-		return iRetVal;
 	}
 
 	/*
@@ -140,7 +99,6 @@ public class MqTranSendService {
 	@SuppressWarnings("unchecked")
 	public int sendFile() {
 		int iRetVal = 0;
-		MqChannelPool channelPool = MqChannelPool.getSingleInstance(factory);
 		MqChannel dataChannel = new MqChannel();
 		MqChannel ctrlChannel = new MqChannel();
 		MqChannel feedbackChannel = new MqChannel();
@@ -203,51 +161,33 @@ public class MqTranSendService {
 				transInfo.setTotalFinishedSize(sendFileControl.sendedDataSize);
 
 				// 删除此文件
-				contorlMsgPersistFile = new File(GlobalVar.tempPath + "/send/" + ByteBuffer.ByteToHex(msgid));					// String(msgid,"ISO-8859-1")));
+				contorlMsgPersistFile = new File(GlobalVar.tempPath + "/send/" + ByteBuffer.ByteToHex(msgid)); // String(msgid,"ISO-8859-1")));
 				contorlMsgPersistFile.delete();
 				return iRetVal;
 			}
 			fileTransControlMsg.segSize = sendFileControl.segSize;
 			// 2.取得与MQ的连接
-			dataChannel.setQueueName(fileTransControlMsg.fileName);
+			dataChannel.setQueueName(fileTransControlMsg.chunkFileName);
 			dataChannel = channelPool.getMqChannel(dataChannel);
-			
+
 			ctrlChannel.setQueueName(fileTransControlMsg.fileName + GlobalVar.fileTransControlQueueName);
-			
+
 			feedbackChannel.setQueueName(fileTransControlMsg.fileName + GlobalVar.fileTransControlFinishQueueName);
-			
-			if (dataChannel == null) {
-				iRetVal = 1;
-				return iRetVal;
-			}
+
 			// 判断fileTransControlMsg对应的消息是否在"+GlobalVar.fileTransControlQueueName+"队列中存在
 			if (isExistFileTransControlMsg(ctrlChannel)) {
 				iRetVal = sendFileTransControlMsg(ctrlChannel);
 				if (iRetVal != 0) {
 					return iRetVal;
 				}
-				if (isExistFileTransControlFinishMsg(feedbackChannel)) {// 存在的话，则表示文件已经传输完毕了 
-					iRetVal = 0;
-					return iRetVal;
-				}
+				// if (isExistFileTransControlFinishMsg(feedbackChannel)) {//
+				// 存在的话，则表示文件已经传输完毕了
+				// iRetVal = 0;
+				// return iRetVal;
+				// }
 				if (Long.parseLong(fileTransControlMsg.dataSize) == sendFileControl.sendedDataSize) {
 					transInfo.setTotalSendedSize(sendFileControl.sendedDataSize);
 					transInfo.setTotalFinishedSize(sendFileControl.sendedDataSize);
-					// 这个表明数据已经发送完，需要发送一条文件已经传输完毕的消息来触发接收接口进行接收
-					// 调用发送文件已经传输完毕的消息到MQ中
-					// 发送文件已经传输完毕的消息到MQ中成功
-					int transStatus = sendFileTransFinishedMsg(ctrlChannel);
-					if (transStatus == 0) {
-						sendFileControl.retVal = 0;
-						return iRetVal;
-					} else {
-						sendFileControl.retVal = transStatus;
-						// 如果是与队列管理器连接的错误，则需要清理连接池中无效的连接
-						if (transStatus == 2) {
-							channelPool.destoryAllChannel();
-						}
-						return transStatus;
-					}
 				}
 			} else {
 				if (GlobalVar.isMsgPersist) {
@@ -266,8 +206,9 @@ public class MqTranSendService {
 
 				// 发送文件传输控制消息到"+GlobalVar.fileTransControlQueueName+"队列中
 				iRetVal = sendFileTransControlMsg(ctrlChannel);
-				if (iRetVal != 0)
+				if (iRetVal != 0) {
 					return iRetVal;
+				}
 			}
 			transInfo.setTotalSendedSize(sendFileControl.sendedDataSize);
 			// 开始需要从失败的那点开始进行传输了
@@ -293,25 +234,9 @@ public class MqTranSendService {
 			byte msgDataSize[] = new byte[Constants.MSGDATASIZE_LENGTH];
 			byte fileOffset[] = new byte[Constants.OFFSET_LENGTH];
 
+			BasicProperties.Builder builder = new BasicProperties.Builder();
+			Map<String, Object> headers = new HashMap<String, Object>();
 			while (sendFileControl.sendedDataSize != transFileDataSize) {// 循环发送数据
-																			// if
-																			// (GlobalVar.isMsgPersist)
-																			// message.persistence
-																			// =
-																			// MQC.MQPER_PERSISTENT;
-																			// else
-																			// message.persistence
-																			// =
-																			// MQC.MQPER_NOT_PERSISTENT;
-																			// message.messageType
-																			// =
-																			// MQC.MQMT_DATAGRAM;
-																			// message.format
-																			// =
-																			// MQC.MQFMT_NONE;
-																			// message.messageId
-																			// =
-																			// msgid;
 
 				sendDataLength = (int) (transFileDataSize - sendFileControl.sendedDataSize);
 				if (sendDataLength > segSize)
@@ -326,17 +251,25 @@ public class MqTranSendService {
 				ByteBuffer.memset(msgDataSize, (byte) ' ');
 				ByteBuffer.memset(fileOffset, (byte) ' ');
 				int length = Long.toString(sendDataLength).getBytes().length;
-				if (length > Constants.MSGDATASIZE_LENGTH)
+				if (length > Constants.MSGDATASIZE_LENGTH) {
 					length = Constants.MSGDATASIZE_LENGTH;
+				}
 				ByteBuffer.memcpy(msgDataSize, 0, Long.toString(sendDataLength).getBytes(), 0, length);
+
 				length = Long.toString(seekOffset - offsetFile).getBytes().length;
-				if (length > Constants.OFFSET_LENGTH)
+				if (length > Constants.OFFSET_LENGTH) {
 					length = Constants.OFFSET_LENGTH;
+				}
 				ByteBuffer.memcpy(fileOffset, 0, Long.toString(seekOffset - offsetFile).getBytes(), 0, length);
 				seekOffset += sendDataLength;
 				// 把这个数据当中MQ消息数据区中的数据发送出去
 				startTime = System.currentTimeMillis();
-				factory.putData(new MsgDes(), sendBuffer, dataChannel);
+
+				headers.put("fileOffset", fileOffset);
+				headers.put("msgDataSize", msgDataSize);
+				builder.headers(headers);
+				dataChannel.getChannel().basicPublish("", dataChannel.getQueueName(), builder.build(), sendBuffer);
+
 				transInfo.setTotalSendedTime(System.currentTimeMillis() - startTime);
 				// 发送成功
 				transInfo.setTotalSendedSize(sendDataLength);
@@ -348,10 +281,10 @@ public class MqTranSendService {
 					writeAccess1.seek(0);
 					writeAccess1.write(sendFileControl.packMsgData());
 				}
+				headers.clear();
 			}
 
 			// 发送文件已经传输完毕的消息到MQ中成功
-			iRetVal = sendFileTransFinishedMsg(ctrlChannel);
 			if (iRetVal == 0) {
 				sendFileControl.isFinished = true;
 				if (GlobalVar.isControlMsgPersist) {
@@ -360,9 +293,12 @@ public class MqTranSendService {
 					writeAccess1.write(sendFileControl.packMsgData());
 				}
 			}
+			
 			// 如果是与队列管理器连接的错误，则需要清理连接池中无效的连接
 			if (iRetVal == 2) {
 				channelPool.destoryAllChannel();
+			}
+			while(!isExistFileTransControlFinishMsg(feedbackChannel)){
 			}
 		} catch (Exception exc) {
 			exc.printStackTrace();

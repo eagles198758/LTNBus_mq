@@ -1,9 +1,8 @@
 package com.sinux.mq.client.file.services;
 
 /**
- * @author jingwen.tong 2006-12-14 
- *  Copyright IBM 2005
  * 一些全局变量定义，需要从配置文件中读取
+ * @author zhongkehexun
  */
 import java.security.*;
 import java.util.HashMap;
@@ -37,7 +36,7 @@ public class GlobalVar {
 	public static long filesizeChunk = 10240;
 	public static int chunknum = 5;
 	public static String queueName = null;
-	public static String tempPath = null;
+	public static String tempPath = "f:/";
 	public static int channelPoolNum = 100;//连接池的所允许的最大数目
 
 	@SuppressWarnings("rawtypes")
@@ -52,5 +51,7 @@ public class GlobalVar {
 	public static String fileTransControlQueueName = ".FILETRANS.CONTROL";
 
 	public static String fileTransControlFinishQueueName = ".FILETRANS.CONTROL.FINISH";
+	
+	public static String tempFilePath = null;
 
 }

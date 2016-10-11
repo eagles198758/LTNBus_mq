@@ -1,6 +1,7 @@
 package com.sinux.mq.client;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -11,7 +12,9 @@ import com.rabbitmq.client.ConsumerCancelledException;
 import com.rabbitmq.client.QueueingConsumer;
 import com.rabbitmq.client.ShutdownSignalException;
 import com.rabbitmq.client.AMQP.BasicProperties;
+import com.sinux.mq.client.file.services.MqTransInterface;
 import com.sinux.mq.client.mod.MsgDes;
+import com.sinux.mq.client.mod.TransInfo;
 import com.sinux.mq.client.util.ByteArrayutil;
 import com.sinux.mq.client.util.ExchangeType;
 
@@ -22,13 +25,13 @@ import com.sinux.mq.client.util.ExchangeType;
  *
  */
 public class MqConnectionFactory {
-	private static String host = null;
-	private static String userName = null;
-	private static String passWord = null;
-	private static String port = null;
-	private static Connection connection;
-	private static ConnectionFactory factory;
-	private static boolean autoAck = true;
+	private String host = null;
+	private String userName = null;
+	private String passWord = null;
+	private String port = null;
+	private volatile static Connection connection;
+	private ConnectionFactory factory;
+	private boolean autoAck = true;
 	// private final String propFilePath = "";
 
 	/**
@@ -43,7 +46,6 @@ public class MqConnectionFactory {
 	 * @param passWord
 	 *            √‹¬Î
 	 */
-	@SuppressWarnings("static-access")
 	public MqConnectionFactory(String host, String port, String userName, String passWord) {
 		this.host = host;
 		this.port = port;
@@ -77,7 +79,7 @@ public class MqConnectionFactory {
 	 * @throws IOException
 	 * @throws TimeoutException
 	 */
-	private static Connection getConnection() throws IOException, TimeoutException {
+	private Connection getConnection() throws IOException, TimeoutException {
 		if (factory == null) {
 			factory = new ConnectionFactory();
 			factory.setHost(host);
@@ -86,7 +88,11 @@ public class MqConnectionFactory {
 			factory.setPassword(passWord);
 		}
 		if (connection == null) {
-			connection = factory.newConnection();
+			synchronized (this) {
+				if(connection == null){
+					connection = factory.newConnection();
+				}
+			}
 		}
 		return connection;
 	}
@@ -350,11 +356,43 @@ public class MqConnectionFactory {
 		}
 	}
 
-	public int putFile(String inputFilePath, MqChannel mqChannel, String queueName) {
+	public int putFile(String inputFilePath) {
+		if(inputFilePath == null){
+			return -1;
+		}
+		if(connection == null || !connection.isOpen()){
+			return -1;
+		}
+		MqTransInterface tranInterface = new MqTransInterface(this);
+		TransInfo transInfo = new TransInfo();
+		try {
+			MqTransInterface.initFromConfig("./sysparamconfig.xml");
+			String reciveName = inputFilePath.substring(inputFilePath.lastIndexOf("/") + 1);
+			return tranInterface.sendFile(inputFilePath, reciveName, transInfo);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 		return -1;
 	}
 
-	public int getFile(String outputFilePath, MqChannel mqChannel, String queueName) {
+	@SuppressWarnings("rawtypes")
+	public int getFile(String outputFilePath, String recvFileName) {
+		if(outputFilePath == null){
+			return -1;
+		}
+		if(connection == null || !connection.isOpen()){
+			return -1;
+		}
+		MqTransInterface tranInterface = new MqTransInterface(this);
+		TransInfo transInfo = new TransInfo();
+		try {
+			MqTransInterface.initFromConfig("./sysparamconfig.xml");
+			if(tranInterface.recvFile(outputFilePath, recvFileName, transInfo, new LinkedList()) != null){
+				return 0;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 		return -1;
 	}
 
